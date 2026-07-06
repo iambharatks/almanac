@@ -106,6 +106,32 @@ Like SSTables, B-trees keep keys sorted (efficient lookups + range queries). But
 
 **B-tree optimizations:** copy-on-write instead of WAL (LMDB — also good for snapshot isolation, Day 11); key abbreviation in interior pages (higher branching factor, fewer levels — the "B+ tree" variant); attempting sequential leaf layout on disk; sibling pointers between leaves for in-order scans; fractal trees (log-structured borrowings).
 
+## A4½. B-trees at runtime — buffer pool, dirty pages, checkpoints (added 2026-07-06, mirrors the LSM component table)
+
+DDIA describes the B-tree *structure*; here's the *runtime* — no real engine touches the on-disk tree during your `UPDATE`.
+
+### Where each B-tree component lives
+
+| Location | Components |
+|---|---|
+| **Main memory (RAM)** | **Buffer pool** — DB-managed cache of fixed-size pages (clean + dirty); root/upper levels effectively always resident |
+| **Persistent disk** | The tree/heap files — pages at fixed offsets (**this IS the database**: InnoDB `.ibd` clustered index = the table; Postgres heap files + index files) · **WAL/redo log** (sequential, temporary insurance — recycled after checkpoint) |
+
+### The buffer pool (the memtable's counterpart)
+
+- A large in-RAM page cache **managed by the DB itself**, not the OS (InnoDB `innodb_buffer_pool_size`, often ~75% of RAM; Postgres `shared_buffers` + OS page cache). Self-managed because the DB must control eviction, track dirty pages, and enforce the **WAL rule**: a page may never be flushed before its WAL record is on disk.
+- Internals: hash map page-id → frame; LRU variant for eviction (InnoDB uses midpoint insertion so table scans don't evict the hot set; Postgres uses clock-sweep).
+- **Every read and write goes through it** — pages are modified only in RAM.
+
+### Runtime flow
+
+- **Write:** traverse root→leaf in the buffer pool (miss = read that one page from disk) → modify page in RAM → page is now **dirty** (in-RAM contents ≠ on-disk copy) → **commit = WAL append + fsync** (sequential; the only I/O needed to ack) → later, the background flusher/**checkpoint** writes dirty pages to their fixed home offsets (random I/O, but batched/coalesced — a hot page absorbing 500 updates is written once) → WAL up to the checkpoint recycled.
+- **Read:** root→leaf in the pool; hot working set = zero disk I/O, worst case ~1 leaf read. No Bloom filters needed — each key exists in exactly one place.
+- **Eviction:** clean page → drop instantly; dirty page → must be written first (why small pools stall under write pressure).
+- **Crash recovery:** redo WAL from the last checkpoint; the WAL is the only durable copy of changes between checkpoints — exactly the LSM pattern (WAL ↔ WAL, memtable ↔ dirty pages, memtable flush ↔ checkpoint, compaction ↔ in-place write-back). The commit is itself a WAL record (fsynced before the ack): TX with COMMIT record → redo; without → undo/skip (InnoDB: ARIES "redo all, undo losers"; Postgres: MVCC — uncommitted rows just stay invisible). Torn WAL tail → checksum → truncate.
+- **Checkpoints bound recovery time:** replay window = WAL since last checkpoint only (older WAL recycled). The frequency knob trades restart speed vs background I/O: often = fast recovery, more flushing (+ Postgres full-page writes); rarely = less I/O, bigger dirty backlog, slower restart (Postgres `checkpoint_timeout`/`max_wal_size`; InnoDB continuous fuzzy checkpointing). LSM analog: replay capped by memtable size — WAL discarded at every flush.
+- **Extra page-write costs:** InnoDB **doublewrite buffer** (pages written twice to survive torn pages); Postgres **full-page writes** (first touch of a page after each checkpoint logs the whole page image to WAL).
+
 ## A5. B-trees vs LSM-trees (the tradeoff table to memorize)
 
 Rule of thumb: **LSM = faster writes; B-tree = faster reads** (LSM reads must check memtable + several SSTables at various compaction stages). But benchmarks are workload-sensitive — test with *your* workload.
@@ -522,6 +548,38 @@ Every row sets exactly one bit across the set — the bitmaps are an alternative
 **6. Writes = LSM again.** Sorted compressed files can't take in-place inserts (one middle insert would rewrite all column files). Writes buffer in an in-memory sorted store; queries merge memory + disk transparently; background bulk merges rewrite column files (Vertica).
 
 **Self-check:** 10M rows, 100k distinct values — why is the bitmap set still small? (a) Each bitmap is extremely sparse (≈100 ones in 10M bits) → RLE collapses it; (b) across all 100k bitmaps there are only 10M ones *total* (one per row) — the information content is the column itself, just rearranged.
+
+## Doubt: In reality, how does a B-tree database actually serve writes/reads compared to LSM — the whole flow? (asked 2026-07-06)
+
+**The surprise: the commit path is nearly identical in both engines.** DDIA's structural picture ("B-trees overwrite pages in place") describes the *data structure*, not the *runtime*. No real B-tree database seeks to a page on disk during your `UPDATE`. The full flow (Postgres/InnoDB style):
+
+**Write path:**
+
+1. **Find the row — in the buffer pool.** The buffer pool is a large RAM cache of fixed-size pages (often 50–75% of machine RAM; InnoDB 16 KB pages, Postgres 8 KB). Traversal root → leaf happens against cached pages; a miss reads that one page from disk into the pool. Upper tree levels are effectively always resident.
+2. **Modify the page in RAM.** The leaf page is changed in the buffer pool and marked **dirty**. Nothing is written to the B-tree on disk yet. (MVCC bookkeeping happens here too: InnoDB writes the old version to its undo log; Postgres leaves the old row version in place.)
+3. **Commit = WAL append + fsync.** The change record goes to the write-ahead log — a **sequential** write, the only disk I/O required to acknowledge the commit. Exactly the same move as LSM's WAL-then-memtable.
+4. **Background write-back (checkpointing).** A flusher/checkpointer later writes dirty pages to their *fixed home locations* — random I/O, but batched, sorted, and coalesced (a hot page absorbing 500 row updates is written once). After a checkpoint completes, WAL segments older than it are recycled.
+5. **Crash recovery:** replay WAL from the last checkpoint onto the pages (redo); roll back uncommitted transactions (undo). Same "log is truth, structures are rebuildable" principle as the memtable rebuild.
+
+**Read path:** one structure — traverse root → leaf in the buffer pool. Hot working set ⇒ zero disk I/O; worst case ~1 leaf read. No Bloom filters needed: a key lives in exactly one place.
+
+**The real mapping between the two worlds:**
+
+| Role | LSM | B-tree |
+|---|---|---|
+| Durability at commit | WAL (sequential) | WAL/redo log (sequential) |
+| RAM write buffer | memtable | buffer pool dirty pages |
+| Background disk work | memtable flush + compaction (sequential, rewrites data repeatedly) | checkpoint write-back **in place** (random, whole-page granularity) |
+| Read structure | memtable + many SSTables (Bloom filters) | one tree, upper levels cached |
+| Log reclaimed when | memtable flushed | checkpoint completes |
+
+**So where does the difference actually bite?** Not at commit time — both ack after a sequential append. It's the *background I/O pattern* plus *write granularity*: a B-tree changing 100 bytes eventually writes a full 8–16 KB page (InnoDB even twice — the doublewrite buffer protects against torn pages; Postgres writes a full page image to WAL on first touch after each checkpoint). LSM's background work is all sequential, but rewrites the same data across compaction generations. Under a heavy random-write firehose, B-tree checkpointing becomes a random-I/O storm and dirty pages pile up faster than they flush; LSM keeps everything sequential and just accumulates compaction debt instead.
+
+**Follow-up: how does recovery distinguish committed-but-unflushed from uncommitted?** Not via the client ack (client-side, gone after crash) — **the commit is itself a WAL record.** All of a transaction's WAL records carry its transaction ID, ending with a COMMIT record; "committed" *means* that record is fsynced (the ack is sent only after). Recovery scans the log: TX has COMMIT record → redo; change records but no COMMIT → undo/skip. InnoDB does ARIES-style "redo all, undo losers" (replay everything, then roll back via undo log); Postgres needs no undo pass — MVCC row versions of a transaction never marked committed in `pg_xact` simply stay invisible. Torn tail: each WAL record has a **checksum**; recovery truncates at the first corrupt record — safe because a half-written record never produced an ack.
+
+**Follow-up: isn't rebuilding dirty pages from WAL slow on restart?** It would be — so checkpoints bound it: recovery replays only WAL **since the last checkpoint** (everything before is guaranteed on-disk in the tree files; older WAL recycled). Tunable tradeoff: checkpoint often = fast restart but more background I/O (and in Postgres more full-page writes); rarely = less I/O but bigger dirty backlog and slower recovery. Postgres: `checkpoint_timeout` / `max_wal_size`, smoothed by `checkpoint_completion_target`; InnoDB: continuous fuzzy checkpointing with adaptive flushing. LSM analog: replay is capped by memtable size (WAL discarded at every flush), so restart = one sequential read + memory-speed re-inserts.
+
+**Why reality still mostly picks B-trees (Postgres, MySQL, Oracle, SQL Server):** typical OLTP is read-heavy with the working set in RAM, so the buffer pool absorbs nearly everything and LSM's write advantage never materializes; B-tree latency is predictable (no compaction spikes at p99); one-copy-per-key makes locking and transactional semantics simpler (§A5); and four decades of maturity. LSM engines win when sustained write/ingest volume dominates — logs, time-series, messaging, huge append-mostly datasets (Cassandra, RocksDB-backed systems).
 
 ---
 
