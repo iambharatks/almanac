@@ -18,7 +18,6 @@ public:
             }
             if(tot == 2){
                 res = max(res,i-l+1);
-                cout<<l<<" "<<i<<'\n';
             }
         }
         if(tot < 2)
