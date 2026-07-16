@@ -16,11 +16,13 @@ public:
                     tot--;
                 l++;
             }
-            if(tot <= 2){
+            if(tot == 2){
                 res = max(res,i-l+1);
                 cout<<l<<" "<<i<<'\n';
             }
         }
+        if(tot < 2)
+            return size(fruits);
         return res;
     }
 };
