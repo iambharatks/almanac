@@ -24,25 +24,31 @@ jobs:
           git checkout -B leetcode
           
           # Create target directory
-          mkdir -p DSA/leetcode
+          mkdir -p dsa/leetcode
 
-          # MOVE LOGIC:
-          # We only move directories that are NOT 'DSA', '.git', or '.github'
-          # This prevents the script from ever touching the DSA folder itself.
+          # Iterate through top-level directories
           for dir in */; do
             dir_name=${dir%/}
             
-            # The 'if' block ensures we NEVER move the 'DSA' folder
-            if [[ "$dir_name" != "DSA" && "$dir_name" != ".git" && "$dir_name" != ".github" ]]; then
-              echo "Moving $dir_name to DSA/leetcode/"
-              mv "$dir_name" DSA/leetcode/
+            # The 'if' block ensures we NEVER move the 'dsa' or system folders
+            if [[ "$dir_name" != "dsa" && "$dir_name" != ".git" && "$dir_name" != ".github" ]]; then
+              echo "Moving $dir_name to dsa/leetcode/"
+              
+              # Use -T (no-target-directory) to ensure we move the folder itself,
+              # not its contents, and avoid accidentally merging into an existing folder.
+              mv -T "$dir_name" "dsa/leetcode/$dir_name"
+              
+              # Explicitly remove the source if it still exists (Safety check)
+              if [ -d "$dir_name" ]; then
+                rm -rf "$dir_name"
+              fi
             fi
           done
 
           # Commit only if there are changes
           if [ -n "$(git status --porcelain)" ]; then
-            git add DSA/leetcode/
-            git commit -m "Auto-organized: Move new problems into DSA/leetcode/"
+            git add dsa/leetcode/
+            git commit -m "Auto-organized: Move new problems into dsa/leetcode/"
             git push origin leetcode
           else
             echo "No new problems to organize."
