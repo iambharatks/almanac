@@ -1,0 +1,46 @@
+name: Auto-Organize LeetCode
+on:
+  push:
+    branches:
+      - main  # Or whichever branch LeetHub pushes to
+
+jobs:
+  organize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Move and Organize Files
+        run: |
+          # 1. Create the target directory
+          mkdir -p dsa/leetcode
+
+          # 2. Identify and move folders (LeetHub creates a folder per problem)
+          # We move all directories EXCEPT .git, .github, and our target directory
+          for dir in */; do
+            # Remove trailing slash
+            dir_name=${dir%/}
+            
+            # Skip folders we don't want to move
+            if [[ "$dir_name" != "dsa" && "$dir_name" != ".git" && "$dir_name" != ".github" ]]; then
+              echo "Moving $dir_name to dsa/leetcode/"
+              mv "$dir_name" dsa/leetcode/
+            fi
+          done
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "iambharatks"
+          git config --global user.email "iambharatks@gmail.com"
+          
+          # Check if there are changes to commit
+          if [ -n "$(git status --porcelain)" ]; then
+            git add dsa/leetcode/
+            git commit -m "Auto-organized: Move LeetCode problems into dsa/leetcode/"
+            git push origin main
+          else
+            echo "No changes to organize."
+          fi
