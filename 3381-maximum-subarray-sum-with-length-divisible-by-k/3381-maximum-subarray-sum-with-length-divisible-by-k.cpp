@@ -1,19 +1,14 @@
 class Solution {
 public:
     long long maxSubarraySum(vector<int>& nums, int k) {
-        vector<long long> minSums(k,0);
-        long long res = LONG_LONG_MIN;
-        long long sum = 0;
+        vector<long long> kBucket(k,LONG_LONG_MAX/2);
+        long long prefixSum = 0, maxSum = LONG_LONG_MIN;
+        kBucket[k-1] = 0;
         for(int i = 0 ; i < size(nums) ; i++){
-            sum += nums[i];
-            if(i >= k-1)
-                res = max(res,sum-minSums[i%k]);
-            if(i < k-1){
-                minSums[i%k] = sum;
-            }else{
-                minSums[i%k] = min(minSums[i%k],sum);
-            }
+            prefixSum += nums[i];
+            maxSum = max(maxSum,prefixSum-kBucket[i%k]);
+            kBucket[i%k] = min(kBucket[i%k],prefixSum);
         }
-        return res;
+        return maxSum;
     }
 };
