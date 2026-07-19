@@ -1,8 +1,8 @@
-name: Auto-Organize LeetCode
+name: Auto-Organize to Leetcode Branch
 on:
   push:
     branches:
-      - main  # Or whichever branch LeetHub pushes to
+      - main
 
 jobs:
   organize:
@@ -12,35 +12,38 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Move and Organize Files
+      - name: Organize and Push
         run: |
-          # 1. Create the target directory
-          mkdir -p dsa/leetcode
+          git config --global user.name "iambharatks@gmail.com"
+          git config --global user.email "iambharatks@gmail.com"
+          
+          # Switch to (or create) the leetcode branch
+          git checkout -B leetcode
+          
+          # Create target directory
+          mkdir -p DSA/leetcode
 
-          # 2. Identify and move folders (LeetHub creates a folder per problem)
-          # We move all directories EXCEPT .git, .github, and our target directory
+          # MOVE LOGIC:
+          # We only move directories that are NOT 'DSA', '.git', or '.github'
+          # This prevents the script from ever touching the DSA folder itself.
           for dir in */; do
-            # Remove trailing slash
             dir_name=${dir%/}
             
-            # Skip folders we don't want to move
-            if [[ "$dir_name" != "dsa" && "$dir_name" != ".git" && "$dir_name" != ".github" ]]; then
-              echo "Moving $dir_name to dsa/leetcode/"
-              mv "$dir_name" dsa/leetcode/
+            # The 'if' block ensures we NEVER move the 'DSA' folder
+            if [[ "$dir_name" != "DSA" && "$dir_name" != ".git" && "$dir_name" != ".github" ]]; then
+              echo "Moving $dir_name to DSA/leetcode/"
+              mv "$dir_name" DSA/leetcode/
             fi
           done
 
-      - name: Commit and Push
-        run: |
-          git config --global user.name "iambharatks"
-          git config --global user.email "iambharatks@gmail.com"
-          
-          # Check if there are changes to commit
+          # Commit only if there are changes
           if [ -n "$(git status --porcelain)" ]; then
-            git add dsa/leetcode/
-            git commit -m "Auto-organized: Move LeetCode problems into dsa/leetcode/"
-            git push origin main
+            git add DSA/leetcode/
+            git commit -m "Auto-organized: Move new problems into DSA/leetcode/"
+            git push origin leetcode
           else
-            echo "No changes to organize."
+            echo "No new problems to organize."
           fi
