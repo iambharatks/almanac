@@ -1,0 +1,81 @@
+name: Organize LeetHub Submissions
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  move-leethub-submission:
+    # This prevents an infinite loop. The action won't trigger itself.
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches all history for all branches
+
+      - name: Configure Git Identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Process, Move, and Clean Submissions
+        run: |
+          # 1. Find the top-level folders that were added in this specific commit
+          # We ignore hidden folders (like .github or .git) to avoid breaking the repo
+          CHANGED_DIRS=$(git diff-tree --no-commit-id --name-only -r HEAD | awk -F/ '{print $1}' | grep -v '^\.' | sort -u)
+          
+          if [ -z "$CHANGED_DIRS" ]; then
+            echo "No root directories modified. Exiting."
+            exit 0
+          fi
+
+          echo "Found LeetHub directories: $CHANGED_DIRS"
+
+          # 2. Copy the folders to a temporary cache outside the git tree
+          mkdir -p /tmp/leetcode_cache
+          for DIR in $CHANGED_DIRS; do
+            if [ -d "$DIR" ]; then
+              cp -r "$DIR" /tmp/leetcode_cache/
+            fi
+          done
+
+          # Exit if no actual directories were caught (e.g., if only a root README was edited)
+          if [ -z "$(ls -A /tmp/leetcode_cache)" ]; then
+            echo "No valid directories to move."
+            exit 0
+          fi
+
+          # 3. Switch to 'leetcode' branch (create it if it doesn't exist)
+          git fetch origin leetcode || echo "Branch leetcode does not exist yet"
+          git checkout leetcode 2>/dev/null || git checkout -b leetcode
+
+          # 4. Move files into the target folder on the leetcode branch
+          mkdir -p dsa/leetcode/
+          cp -r /tmp/leetcode_cache/* dsa/leetcode/
+          
+          # 5. Commit and Push to 'leetcode' branch
+          git add dsa/leetcode/
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "chore: sync LeetHub submission to dsa/leetcode/ [skip ci]"
+            git push -u origin leetcode
+          fi
+
+          # 6. Switch back to 'main' branch to delete the root folders
+          git checkout main
+          for DIR in $CHANGED_DIRS; do
+            if [ -d "$DIR" ]; then
+              git rm -r "$DIR"
+            fi
+          done
+
+          # 7. Commit and Push the deletion to 'main' branch
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "chore: clean up LeetHub root submissions [skip ci]"
+            git push origin main
+          fi
