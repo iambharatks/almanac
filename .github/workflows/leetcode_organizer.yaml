@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: leetcode
-          fetch-depth: 1
+          fetch-depth: 2 # Fetches enough history to read the previous commit message
 
       - name: Configure Git Identity
         run: |
@@ -69,7 +69,17 @@ jobs:
             mv "$DIR" dsa/leetcode/
           done
 
-          # THE FIX: 'git add -A' tracks both the newly moved files AND the root deletions
           git add -A
-          git commit -m "chore: auto-organize new LeetCode submissions [skip ci]"
+          
+          # Extract the exact commit message from LeetHub
+          git log -1 --pretty=%B > commit_message.txt
+          
+          # Append the skip-ci flag so we don't cause an infinite loop
+          echo "" >> commit_message.txt
+          echo "[skip ci]" >> commit_message.txt
+          
+          # Commit using the preserved message and clean up
+          git commit -F commit_message.txt
+          rm commit_message.txt
+          
           git push origin leetcode
