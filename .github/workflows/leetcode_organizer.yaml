@@ -3,11 +3,10 @@ name: Organize LeetHub Submissions
 on:
   push:
     branches:
-      - leetcode
+      - leetcode 
 
 jobs:
   organize-leetcode-branch:
-    # Ensure we don't trigger the action from its own commits
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     permissions:
@@ -27,42 +26,50 @@ jobs:
 
       - name: Move Root Submissions to dsa/leetcode/
         run: |
-          # 1. Define authorized directories that we should NOT move
-          # We keep 'dsa' and '.github' where they are
-          AUTHORIZED_DIRS=("dsa" ".github")
+          # Protected directories that should never be moved
+          PROTECTED_DIRS=(
+            "dsa" 
+            ".github" 
+            ".git" 
+            ".vscode"     
+            ".idea"       
+            "venv"        
+            ".venv"
+            "env"
+            "node_modules" 
+            "__pycache__"  
+          )
           
-          # 2. Find all directories in the root
+          # Find all directories in root, ignoring the current directory '.'
           ROOT_DIRS=$(find . -maxdepth 1 -type d -not -name '.' | sed 's|^\./||')
           
           DIRS_TO_MOVE=()
           for DIR in $ROOT_DIRS; do
-            IS_AUTHORIZED=false
-            for AUTH in "${AUTHORIZED_DIRS[@]}"; do
-              if [ "$DIR" == "$AUTH" ]; then
-                IS_AUTHORIZED=true
+            IS_PROTECTED=false
+            for PROTECT in "${PROTECTED_DIRS[@]}"; do
+              if [ "$DIR" == "$PROTECT" ]; then
+                IS_PROTECTED=true
                 break
               fi
             done
             
-            if [ "$IS_AUTHORIZED" = false ]; then
+            if [ "$IS_PROTECTED" = false ]; then
               DIRS_TO_MOVE+=("$DIR")
             fi
           done
 
-          # 3. If nothing needs moving, exit
           if [ ${#DIRS_TO_MOVE[@]} -eq 0 ]; then
-            echo "No folders found in root to move."
+            echo "No root submissions to move."
             exit 0
           fi
 
-          # 4. Create the target directory and move the folders
           mkdir -p dsa/leetcode/
           for DIR in "${DIRS_TO_MOVE[@]}"; do
-            echo "Moving $DIR to dsa/leetcode/"
+            echo "Moving $DIR into dsa/leetcode/"
             mv "$DIR" dsa/leetcode/
           done
 
-          # 5. Commit and Push
-          git add dsa/
-          git commit -m "chore: organize submissions into dsa/leetcode/ [skip ci]"
+          # THE FIX: 'git add -A' tracks both the newly moved files AND the root deletions
+          git add -A
+          git commit -m "chore: auto-organize new LeetCode submissions [skip ci]"
           git push origin leetcode
