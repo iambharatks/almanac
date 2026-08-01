@@ -15,11 +15,14 @@ public:
         dp.assign(n,vector<int>(n,-1));
         // int res = choose(nums,0,size(nums)-1);
         for(int i = 0 ; i < n ; i++) dp[i][i] = nums[i];
+        vector<int> ndp(n);
         for(int l = n-1; l >=0 ; l--){
+            ndp[l] = nums[l];
             for(int r = l+1 ; r < n ; r++){
-                dp[l][r] = max(nums[l]-dp[l+1][r],nums[r]-dp[l][r-1]);
+                // dp[l][r] = max(nums[l]-dp[l+1][r],nums[r]-dp[l][r-1]);
+                ndp[r] = max(nums[l]-ndp[r],nums[r]-ndp[r-1]);
             }
         }
-        return dp[0][n-1] >= 0;
+        return ndp[n-1] >= 0;
     }
 };
