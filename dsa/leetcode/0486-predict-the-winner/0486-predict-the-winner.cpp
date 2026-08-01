@@ -1,18 +1,28 @@
 class Solution {
 public:
-    int choose(vector<int> &arr, int l, int r, bool chance){
+    vector<vector<int>> dp;
+    int choose(vector<int> &arr, int l, int r){
         if(l>r) return 0;
-        if(chance){
-            return min(choose(arr,l+1,r,!chance)-arr[l],choose(arr,l,r-1,!chance)-arr[r]);
-        }
-        return max(choose(arr,l+1,r,!chance)+arr[l],choose(arr,l,r-1,!chance)+arr[r]);
+        if(dp[l][r] != -1) return dp[l][r];
+        return dp[l][r] = max(arr[l]-choose(arr,l+1,r),arr[r]-choose(arr,l,r-1));
     }
     bool predictTheWinner(vector<int>& nums) {
         // if 0 
         //     res =  max choose(i+1,n,0)+arr[0]  choose(i,n-1,0) +arr[n-1]
         // if 1 
         //     res = min choose(i+1,n,0)-arr[0]  choose(i,n-1,0) -arr[n-1] 
-        int res = choose(nums,0,size(nums)-1,false);
-        return res >= 0;
+        int n = size(nums);
+        dp.assign(n,vector<int>(n,-1));
+        // int res = choose(nums,0,size(nums)-1);
+        for(int i = 0 ; i < n ; i++) dp[i][i] = nums[i];
+        vector<int> ndp(n);
+        for(int l = n-1; l >=0 ; l--){
+            ndp[l] = nums[l];
+            for(int r = l+1 ; r < n ; r++){
+                // dp[l][r] = max(nums[l]-dp[l+1][r],nums[r]-dp[l][r-1]);
+                ndp[r] = max(nums[l]-ndp[r],nums[r]-ndp[r-1]);
+            }
+        }
+        return ndp[n-1] >= 0;
     }
 };
