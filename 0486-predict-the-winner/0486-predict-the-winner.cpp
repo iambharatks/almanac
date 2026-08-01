@@ -13,8 +13,8 @@ public:
         //     res = min choose(i+1,n,0)-arr[0]  choose(i,n-1,0) -arr[n-1] 
         int n = size(nums);
         dp.assign(n,vector<int>(n,-1));
-        int res = choose(nums,0,size(nums)-1);
-        // for(int i = 0 ; i < n ; i++) dp[i][i] = nums[i];
+        // int res = choose(nums,0,size(nums)-1);
+        for(int i = 0 ; i < n ; i++) dp[i][i] = nums[i];
         for(int l = n-1; l >=0 ; l--){
             for(int r = l+1 ; r < n ; r++){
                 dp[l][r] = max(nums[l]-dp[l+1][r],nums[r]-dp[l][r-1]);
