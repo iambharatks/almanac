@@ -10,7 +10,7 @@ public:
         // maximize(a[l] - rec(l+1,r),a[r]-rec(l,r-1));
         int n = size(piles);
         dp.assign(n,vector<int>(n,-1));
-        // for(int i = 0 ; i < n ; i++) dp[i][i] = i;
+        for(int i = 0 ; i < n ; i++) dp[i][i] = piles[i];
         int res = rec(piles,0,n-1);
         return res > 0;
     }
