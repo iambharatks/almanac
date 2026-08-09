@@ -3,7 +3,7 @@ class Solution {
     vector<vector<int>> dp;
     int rec(int i, int m, vector<int> &piles){
         if(i >= size(piles)) return 0;
-        if(i+m >= size(piles)) return prefix.back() - ((i==0)?0:prefix[i-1]);
+        if(i+2*m >= size(piles)) return prefix.back() - ((i==0)?0:prefix[i-1]);
         if(dp[i][m] != -1) return dp[i][m];
         int score = 0;
         int alice = 0;
