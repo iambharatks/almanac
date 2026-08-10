@@ -13,7 +13,20 @@ public:
     }
     bool winnerSquareGame(int n) {
         // vector<bool> dp(n);
-        dp.assign(n+1,-1);
-        return rec(n);
+        // dp.assign(n+1,-1);
+        // return rec(n);
+        vector<bool> dp(n+1,false);
+        for(int i = 1; i <= n ; i++){
+            int k = (int)sqrt(i);
+            if(k*k == i){
+                dp[i] = true;
+            }
+            for(int j = 1 ; j*j <= i; j++){
+                if(!dp[i-j*j]){ 
+                    dp[i] = true;
+                }
+            }
+        }
+        return dp[n];
     }
 };
