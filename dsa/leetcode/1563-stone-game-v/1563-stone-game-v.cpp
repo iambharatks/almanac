@@ -22,7 +22,28 @@ public:
     }
     int stoneGameV(vector<int>& stoneValue) {
         int n = size(stoneValue);
-        dp.assign(n,vector<int>(n,-1));
-        return rec(0,n-1,stoneValue);
+        dp.assign(n,vector<int>(n,0));
+        for(int i = 1 ; i < n ; i++){
+            stoneValue[i] += stoneValue[i-1];
+        }
+        for(int r = 0 ; r < n ; r++){
+            for(int l = r-1 ; l >= 0; l--){
+                if(l == r){
+                    dp[l][r] = 0;
+                }
+                for(int i = l ; i < r ; i++){
+                    int leftSum = stoneValue[i]-((l>0)?stoneValue[l-1]:0);
+                    int rightSum = stoneValue[r]-stoneValue[i];
+                    if(leftSum >= rightSum){
+                        dp[l][r] = max(rightSum + dp[i+1][r],dp[l][r]); 
+                    }
+                    if(leftSum <= rightSum){
+                        dp[l][r] = max(leftSum + dp[l][i],dp[l][r]); 
+                    }
+                }
+            }
+        }
+        // return rec(0,n-1,stoneValue);
+        return dp[0][n-1];
     }
 };
