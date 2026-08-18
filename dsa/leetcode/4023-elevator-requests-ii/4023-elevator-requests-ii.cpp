@@ -22,22 +22,35 @@ public:
         }
         return dp[l][r][isLeft] = res;
     }
-    long long elevatorRequests(int n, int start, vector<int>& requests) {
+    long long elevatorRequests(int n, int start, vector<int>& req) {
         bool  contains = false;
-        for(int i : requests){
+        for(int i : req){
             if(i == start) {
                 contains = true;
                 break;
             }
         }
         if(!contains){
-            requests.push_back(start);
+            req.push_back(start);
         }
-        n = size(requests);
-        dp.assign(n,vector<vector<long long>>(n,vector<long long>(2,-1)));
-        sort(begin(requests),end(requests));
+        n = size(req);
+        sort(begin(req),end(req));
+        dp.assign(n,vector<vector<long long>>(n,vector<long long>(2,1e18)));
 
-        int ind = lower_bound(begin(requests),end(requests),start)-begin(requests);
-        return rec(ind,ind,true,requests);
+        int ind = lower_bound(begin(req),end(req),start)-begin(req);
+        // return rec(ind,ind,true,req);
+        dp[ind][ind][0] = dp[ind][ind][1] = 0;
+        for(int r = ind ; r < n ; r++){
+            for(int l = ind; l >= 0; l--){
+                if(l == r){ dp[l][r][0] = dp[l][r][1] = 0;
+                continue;}
+                int l1 = l+1;
+                int r1 = r-1;
+                long long rem = n-(r-l);
+                dp[l][r][1] = min(dp[l+1][r][1]+(req[l+1]-req[l])*rem, dp[l+1][r][0]+(req[r]-req[l])*rem);
+                dp[l][r][0] = min(dp[l][r-1][0]+(req[r]-req[r-1])*rem,dp[l][r-1][1]+(req[r]-req[l])*rem);
+            }
+        }
+        return min(dp[0][n-1][0],dp[0][n-1][1]);
     }
 };
