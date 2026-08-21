@@ -26,9 +26,7 @@ public:
             long long c = l + (r-l)/2;
             long long tot = 0;
             for(int i = 1 ; i < totSubsets ; i++){
-                long long curLcm = lcm[i];
-                if(curLcm < 0) curLcm *= -1;
-                if(curLcm > c) continue;
+                if(abs(lcm[i]) > c) continue;
                 tot += c/lcm[i];
             }
             if(tot >= k){
