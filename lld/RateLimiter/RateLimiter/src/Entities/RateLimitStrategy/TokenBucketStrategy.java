@@ -33,7 +33,7 @@ public class TokenBucketStrategy implements RateLimiterStrategy{
 
     @Override
     public boolean isAllowed(String resourceId) {
-        Bucket bucket = counter.computeIfAbsent(resourceId, k -> new Bucket(capacity, 0));
+        Bucket bucket = counter.computeIfAbsent(resourceId, k -> new Bucket(capacity, System.currentTimeMillis()));
         if (bucket.tryConsume(System.currentTimeMillis(), refillRate, capacity)) {
             return true;
         }
