@@ -19,7 +19,7 @@ public class FixedWindowStrategy implements  RateLimiterStrategy{
         this.limit = limit;
         sweeper = Executors.newSingleThreadScheduledExecutor(
                 runnable ->{
-                    Thread thread = new Thread(runnable, "ratelimit-sweeper");
+                    Thread thread = new Thread(runnable, "fixedwindow-ratelimit-sweeper");
                     thread.setDaemon(true);
                     return thread;
                 }

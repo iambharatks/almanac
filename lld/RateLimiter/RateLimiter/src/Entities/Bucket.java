@@ -18,4 +18,8 @@ public final class Bucket {
         tokenCounter -= 1;
         return true;
     }
+    public synchronized boolean isIdle(long now, long threshold){
+        return now-lastRefillMillis > threshold;
+    }
+
 }
