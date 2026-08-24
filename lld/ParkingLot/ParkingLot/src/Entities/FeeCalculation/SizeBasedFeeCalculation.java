@@ -17,7 +17,6 @@ public final class SizeBasedFeeCalculation implements FeeCalculationStrategy{
     public Double calculateFee(Ticket ticket) {
         if(ticket.getEntryTime().isBefore(ticket.getExitTime())){
             long duration = Duration.between(ticket.getExitTime(), LocalDateTime.now()).toHours();
-            Math.max(1, (long) Math.ceil(minutes / 60.0));
             return Math.max(duration*HOURLY_RATES.getOrDefault(ticket.getVehicle().getVehicleSize(),0.0),MIN_FEE);
         }
         System.out.println("Invalid time captured!\nTicket is malformed.\n");
