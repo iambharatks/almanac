@@ -13,22 +13,22 @@ class Solution {
 public:
     string shortestBeautifulSubstring(string s, int k) {
         int r = 0, l = 0;
-        vector<int> count(size(s),0);
-        count[0] = s[0] == '1';
-        if(count[0] == k) return s.substr(0,1);
+        int cur = s[0] == '1';
+        if(cur == k) return s.substr(0,1);
         pair<int,int> res = {0,size(s)};
         for(r =1 ; r < size(s) ; r++){
-            count[r] += count[r-1];
-            if(s[r] == '1') count[r] += 1;
-            int diff = count[r] - ((l == 0)?0:count[l-1]);
-            while(diff >= k){
-                if(diff == k && cmp(s,res.first,res.second,l,r)){ 
+            if(s[r] == '1') cur += 1;
+            while(cur >= k){
+                if(cur == k && cmp(s,res.first,res.second,l,r)){ 
                     res = {l,r};
                 }
+                if(s[l] == '1'){
+                    cur--;
+                }
                 l++;
-                diff = count[r]-count[l-1];
-                if(diff < k) {
+                if(cur < k) {
                     l--;
+                    cur++;
                     break;
                 }
             } 
