@@ -1,0 +1,208 @@
+@startuml
+class Entities.Show {
+- String showName
+- String showId
+- String theatreId
+- TimeSlot timeSlot
+- Map<String,Seat> seats
+- Map<String,Ticket> activeTickets
+- long HOLD_TTL
+- double priceMultiplier
++ String getShowId()
++ String getShowName()
++ List<String> getAvailableSeats(long)
++ Optional<List<Seat>> holdSeats(List<String>,String,long)
++ void releaseSeats(List<String>,String,long)
++ void rollback(List<Seat>,String,BiConsumer<Seat,String>)
++ TimeSlot getTimeSlot()
++ double getPriceMultiplier()
++ Optional<Ticket> confirmSeats(List<Seat>,String,long)
+}
+
+
+class Main {
++ {static} void main(String[])
+}
+
+interface BookingStrategy.SeatSelectionStrategy {
++ List<String> selectSeats(Show,List<String>,long)
+}
+
+interface PriceCalculationStrategy.PriceCalculationStrategy {
++ double calculate(Show,List<String>)
+}
+
+class Entities.Seat.SeatState {
+- SeatStatus status
+- String heldby
+- long expiryMillis
+~ {static} SeatState available()
+~ {static} SeatState heldby(String,long)
++ SeatState booked()
++ String toString()
++ String heldby()
++ SeatStatus status()
++ long expiryMillis()
+}
+
+
+class Entities.Venue {
+~ String name
+~ String city
+~ Map<String,Theatre> theatres
+~ Map<String,Show> shows
+~ PriceCalculationStrategy priceStrategy
+~ PaymentStrategy paymentStrategy
++ Optional<Show> addShow(String,String,TimeSlot)
++ Optional<List<String>> getSeatsForShow(String)
++ Optional<Ticket> bookSeats(String,List<String>,String,long)
+}
+
+
+class BookingStrategy.CustomSeatSelection {
++ List<String> selectSeats(Show,List<String>,long)
+}
+
+class ShowBookingSystem {
+- {static} Scanner in
+- {static} Map<String,String> showLabels
++ {static} void main(String[])
+- {static} Venue buildVenue()
+- {static} void listShows()
+- {static} void viewSeats(Venue)
+- {static} void bookSeats(Venue,String)
+- {static} String selectShow()
+- {static} void printInColumns(List<String>)
+- {static} String promptUserId()
+- {static} String prompt(String)
+- {static} int readInt(String)
+}
+
+
+class Entities.Payment {
+- String userId
+- double amount
+- String txnId
+- PaymentResult paymentResult
++ PaymentResult paymentResult()
++ String userId()
++ String txnId()
++ double amount()
+}
+
+
+enum Entities.Seat.SeatStatus {
++  AVAILABLE
++  HELD
++  BOOKED
+}
+
+enum Entities.PaymentResult {
++  SUCCESS
++  FAILURE
+}
+
+class Entities.Seat.Seat {
+- String seatId
+- AtomicReference<SeatState> state
++ String getSeatId()
++ boolean isAvailable(long)
++ boolean tryHold(String,long,long)
++ boolean releaseHeld(String)
++ boolean isHeldby(String,long)
++ boolean releaseBooked(String)
++ boolean confirmSeat(String,long)
+}
+
+
+class BookingStrategy.AutoSeatSelection {
++ List<String> selectSeats(Show,List<String>,long)
+}
+
+class Entities.Ticket {
+- String ticketId
+- String showID
+- TimeSlot timeSlot
+- String theatreID
+- List<String> bookedSeats
++ String showID()
++ String ticketId()
++ List<String> bookedSeats()
++ TimeSlot timeSlot()
++ String theatreID()
+}
+
+
+class Entities.Theatre {
+- String theatreId
+- List<Seat> seatList
+- TreeMap<TimeSlot,Show> schedule
++ String getTheatreId()
++ List<Seat> getSeatList()
++ Optional<Show> addShow(String,String,TimeSlot)
+}
+
+
+interface PaymentStrategy.PaymentStrategy {
++ Payment pay(double,String)
++ void refund(String)
+}
+
+class PaymentStrategy.MockPaymentStrategy {
+- double failureRate
+- long latencyMillis
++ Payment pay(double,String)
++ void refund(String)
+}
+
+
+class PaymentStrategy.UPIPayment {
++ Payment pay(double,String)
++ void refund(String)
+}
+
+class Entities.TimeSlot {
+- LocalDateTime start
+- LocalDateTime end
++ int compareTo(TimeSlot)
++ boolean overlaps(TimeSlot)
++ LocalDateTime start()
++ LocalDateTime end()
+}
+
+
+class BookingStressTest {
+- {static} Map<String,String> showLabels
+- {static} String showId
++ {static} void main(String[])
+- {static} Venue buildVenue()
+~ {static} void contentionOnSameSeats(Venue,String)
+~ {static} void allOrNothing(Venue,String)
+~ {static} void randomLoad(Venue,String)
+~ {static} void assertNoSeatSoldTwice(List<Ticket>)
+~ {static} List<Ticket> runConcurrently(int,java.util.function.IntFunction<Optional<Ticket>>)
+~ {static} List<String> randomSeats(List<String>,int,int)
+~ {static} void printLatencies(List<Long>)
+~ {static} double ms(List<Long>,double)
+}
+
+
+class Entities.ShowConflictException {
+}
+class PriceCalculationStrategy.ShowBasedPriceStrategy {
+- double basePrice
+- double weekendMultiplier
+- double primeTimeMultiplier
++ double calculate(Show,List<String>)
+}
+
+
+
+
+BookingStrategy.SeatSelectionStrategy <|.. BookingStrategy.CustomSeatSelection
+BookingStrategy.SeatSelectionStrategy <|.. BookingStrategy.AutoSeatSelection
+PaymentStrategy.PaymentStrategy <|.. PaymentStrategy.MockPaymentStrategy
+PaymentStrategy.PaymentStrategy <|.. PaymentStrategy.UPIPayment
+Entities.RuntimeException <|-- Entities.ShowConflictException
+PriceCalculationStrategy.PriceCalculationStrategy <|.. PriceCalculationStrategy.ShowBasedPriceStrategy
+@enduml
