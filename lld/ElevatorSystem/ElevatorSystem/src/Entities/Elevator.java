@@ -1,5 +1,9 @@
+package Entities;
+
+import Entities.SchedulingStrategy.SchedulingStrategy;
+
+import java.util.Random;
 import java.util.TreeSet;
-import java.util.UUID;
 
 public class Elevator {
     private final String elevatorId;
@@ -9,10 +13,11 @@ public class Elevator {
     private Direction currentDirection;
     private final TreeSet<Integer> upRequests, downRequests;
     private final SchedulingStrategy schedulingStrategy;
-
+    // for comparative tracking
+    private int directionChanged = 0;
     public Elevator(String elevatorId, int currentFloor, SchedulingStrategy schedulingStrategy) {
         this.elevatorId = elevatorId;
-        this.currentFloor = 0;
+        this.currentFloor = currentFloor;
         this.currentDirection = Direction.IDLE;
         upRequests = new TreeSet<>();
         downRequests = new TreeSet<>();
@@ -20,49 +25,80 @@ public class Elevator {
         doorState = DoorState.CLOSED;
         doorTicksRemaining = 1;
     }
+    public String getElevatorId() {
+        return  elevatorId;
+    }
+    public int getDirectionChanged(){
+        return directionChanged;
+    }
+
+    public synchronized ElevatorState getElevatorState(){
+        Integer highestPending =(upRequests.isEmpty())?null: upRequests.last();
+        Integer lowestPending = (downRequests.isEmpty())?null: downRequests.first();
+        int pendingRequests = upRequests.size() + downRequests.size();
+        return new ElevatorState(currentFloor, currentDirection, highestPending, lowestPending,pendingRequests);
+    }
 
     public synchronized void tick(){
         if(doorState == DoorState.OPEN){
             closeDoors();
             return;
         }
-        if(currentDirection == Direction.IDLE){
-            chooseDirection();
-            return;
-        }
-        Integer nextFloor = (currentDirection == Direction.UP) ? upRequests.ceiling(currentFloor) : downRequests.floor(currentFloor);
+
+        Integer nextFloor = schedulingStrategy.nextStop(currentFloor, currentDirection, upRequests, downRequests);
+
         if(nextFloor == null){
-            reverseOrIdle();
-            return;
+           reverseorIdle();
+           return;
         }
         if(nextFloor.intValue() == currentFloor){
+            boolean hasUp   = upRequests.contains(nextFloor);
+            boolean hasDown = downRequests.contains(nextFloor);
+
+            Direction old = currentDirection;
+            if (hasUp && !hasDown)      currentDirection = Direction.UP;
+            else if (hasDown && !hasUp) currentDirection = Direction.DOWN;
+            if (old != currentDirection && old != Direction.IDLE) directionChanged++;   // ← count it
+
+            (currentDirection == Direction.UP ? upRequests : downRequests).remove(nextFloor);
             openDoors();
-            ((currentDirection == Direction.UP)? upRequests:downRequests).remove(currentFloor);
-        }else{
-            System.out.println("Moving towards " + nextFloor);
-            currentFloor += ((currentDirection == Direction.UP)?1:-1);
+            return;
         }
+        //Handle direction
+        if(chooseDirection(nextFloor)){
+            return;
+        }
+
+        // move towards it
+        currentFloor += ((currentDirection == Direction.UP)?+1:-1);
     }
 
-    private void chooseDirection(){
-        if(upRequests.isEmpty() && downRequests.isEmpty()){
-            currentDirection = Direction.IDLE;
-        }
-        else if(upRequests.isEmpty()){
+    private boolean chooseDirection(int floor){
+        Direction old = currentDirection;
+        if(currentFloor < floor){
+            currentDirection = Direction.UP;
+        }else if(currentFloor > floor){
             currentDirection = Direction.DOWN;
         }
-        else if(downRequests.isEmpty()){
-            currentDirection = Direction.UP;
+        if(currentDirection != old && old != Direction.IDLE) {
+            directionChanged++;
         }
-        System.out.println("Current chosen direction: " + currentDirection);
+        if(currentDirection != old)
+            System.out.println("[" + elevatorId + "] " + old + " → " + currentDirection + " target=" + floor + " at=" + currentFloor);
+        return currentDirection != old;
     }
 
-    private void reverseOrIdle(){
-        chooseDirection();
+    private void reverseorIdle(){
+        if(upRequests.size() + downRequests.size() > 0 && currentDirection != Direction.IDLE){
+            currentDirection = (currentDirection == Direction.UP) ? Direction.DOWN : Direction.UP;
+            directionChanged++;
+        }else{
+            currentDirection = Direction.IDLE;
+        }
     }
 
     private void openDoors(){
-        System.out.println("Opening Doors for "+currentFloor);
+        System.out.println("[" + elevatorId + "] opening Doors for at "+currentFloor);
         doorState = DoorState.OPEN;
         doorTicksRemaining = 1;
     }
@@ -71,6 +107,8 @@ public class Elevator {
         if(doorState == DoorState.OPEN){
             if(--doorTicksRemaining <= 0){
                 doorState = DoorState.CLOSED;
+                System.out.println("[" + elevatorId + "] closing Doors for at "+currentFloor);
+
             }
         }
     }
@@ -91,19 +129,8 @@ public class Elevator {
         }
     }
 
-    public synchronized void addExternalRequest(int floor) {
-        if(currentFloor == floor){
-            if(doorState == DoorState.OPEN){
-                System.out.println("You are on the same floor, drop off!!");
-            }else{
-                System.out.println("You request came a bit late, now stay and fuck around here!!");
-                ((currentDirection == Direction.UP)?downRequests:upRequests).add(floor);
-            }
-            return;
-        }
-        ((currentFloor < floor)?upRequests:downRequests).add(floor);
-        System.out.println("External request for floor "+ floor + " added in elevator "+elevatorId);
-        return;
+    public synchronized void addExternalRequest(ExternalRequest request) {
+        ((request.direction() == Direction.UP)?upRequests:downRequests).add(request.floor());
     }
 
 }

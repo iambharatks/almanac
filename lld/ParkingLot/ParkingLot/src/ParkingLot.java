@@ -77,15 +77,15 @@ public class ParkingLot {
 
     public Optional<Double> unparkVehicle(String licenseNumber){
         Ticket ticket;
-        ticket = activeTickets.remove(licenseNumber);
         synchronized(this){
-        }
+            ticket = activeTickets.remove(licenseNumber);
             if(ticket == null){
                 System.out.println("Ticket Not Found\n Be ready for penalty");
                 return Optional.of(PENALTY);
             }
             ticket.setExitTime(LocalDateTime.now());
         ticket.getParkingSpot().unparkVehicle(ticket.getVehicle());
+        }
         Double fees = feeStrategy.calculateFee(ticket);
         System.out.println("Please pay your fees!\nFees: " + fees);
         return Optional.of(fees);

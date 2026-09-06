@@ -1,0 +1,69 @@
+@startuml
+class Entities.RateLimiterBuilder {
+- RateLimiterStrategy strategy
++ boolean isAllowed(String)
++ {static} Builder builder()
+}
+
+
+class Entities.RateLimiterBuilder$Builder {
+- RateLimiterStrategy strategy
++ Builder tokenBucket(long,double)
++ Builder fixedWindow(long,int)
++ RateLimiterBuilder build()
+}
+
+
+class RateLimiter {
+- RateLimiterStrategy rateLimiterStrategy
++ boolean isAllowed(String)
+}
+
+
+class ConcurrencyTest {
++ {static} void main(String[])
+}
+
+interface Entities.RateLimitStrategy.RateLimiterStrategy {
++ boolean isAllowed(String)
+}
+
+class Entities.RateLimitStrategy.FixedWindowStrategy {
+- Map<String,AtomicLong> counters
+- long windowSize
+- int limit
+- ScheduledExecutorService sweeper
+- void evictStaleResources()
++ boolean isAllowed(String)
+}
+
+
+class Entities.Bucket {
+- double tokenCounter
+- long lastRefillMillis
++ boolean tryConsume(long,double,double)
++ boolean isIdle(long,long)
+}
+
+
+class Main {
++ {static} void main(String[])
+}
+
+class Entities.RateLimitStrategy.TokenBucketStrategy {
+- Map<String,Bucket> counter
+- long capacity
+- double refillRate
+- long threshold
+- ScheduledExecutorService sweeper
++ boolean isAllowed(String)
+- void evictStaleResources()
+}
+
+
+
+
+Entities.RateLimiterBuilder +.. Entities.RateLimiterBuilder$Builder
+Entities.RateLimitStrategy.RateLimiterStrategy <|.. Entities.RateLimitStrategy.FixedWindowStrategy
+Entities.RateLimitStrategy.RateLimiterStrategy <|.. Entities.RateLimitStrategy.TokenBucketStrategy
+@enduml

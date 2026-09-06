@@ -1,3 +1,8 @@
+package Entities;
+
+import Entities.DispatchStrategy.DispatchStrategy;
+
+import java.util.ArrayList;
 import java.util.List;
 
 public class ElevatorSystem {
@@ -9,16 +14,23 @@ public class ElevatorSystem {
         this.elevators = elevators;
     }
 
-    public boolean requestElevator(int floor, Direction direction) {
-        //TODO : use dispatch strategy here
-        Elevator elevator = dispatchStrategy.selectElevators(elevators, request);
+    public void requestElevator(ExternalRequest request) {
+        Elevator elevator = dispatchStrategy.selectElevator(elevators, request);
+        if(elevator == null) {
+            System.out.println("No elevator found");
+            return;
+        }
         elevator.addExternalRequest(request);
-        return true;
     }
-
+    public List<ElevatorState> getAllElevatorsStates() {
+        return elevators.stream().map(Elevator::getElevatorState).toList();
+    }
     public void tick(){
         for(Elevator elevator : elevators){
             elevator.tick();
         }
+    }
+    public int totalDirectionChanged(){
+        return elevators.stream().mapToInt(Elevator::getDirectionChanged).sum();
     }
 }
