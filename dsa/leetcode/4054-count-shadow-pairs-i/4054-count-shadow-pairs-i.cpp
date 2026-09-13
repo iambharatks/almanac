@@ -20,25 +20,3 @@ public:
         return res;
     }
 };
-
-// class Solution {
-// public:
-//     long long shadowPairs(vector<int>& nums) {
-//         stack<int> st;
-//         int res = 0;
-//         int n = size(nums);
-//         vector<int> dp(n,0);
-//         for(int i = 0 ; i < n; i++){
-//             while(!st.empty() && nums[st.top()] > nums[i]){
-//                 st.pop();
-//             }
-//             if(!st.empty() && nums[st.top()] < nums[i]){
-//                 dp[i] = st.size();
-//                 res += st.size();
-//             }
-//             st.push(i);
-//         }
-
-//         return res;
-//     }
-// };
